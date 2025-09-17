@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Анализ расходов{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card analysis-card">
+            <div class="card-header">
+                <h5 class="mb-0">📈 Виды анализа</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" class="mb-3">
+                    <input type="hidden" name="action" value="category_analysis">
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        📊 Анализ по категориям
+                    </button>
+                </form>
+
+                <form method="post">
+                    <input type="hidden" name="action" value="time_analysis">
+                    <div class="mb-3">
+                        <label for="period" class="form-label">Период группировки:</label>
+                        <select class="form-select" name="period" id="period">
+                            <option value="day">По дням</option>
+                            <option value="month" selected>По месяцам</option>
+                            <option value="year">По годам</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-success w-100">
+                        📅 Анализ по времени
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        {% if analysis_result %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">{{ analysis_type }}</h5>
+            </div>
+            <div class="card-body">
+                {% if analysis_result.type == 'category' %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th class="text-end">Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category, amount in analysis_result.data.items() %}
+                                <tr>
+                                    <td>{{ category }}</td>
+                                    <td class="text-end">{{ "{:,.0f}".format(amount) }} ₽</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-primary">
+                                    <th>Итого:</th>
+                                    <th class="text-end">{{ "{:,.0f}".format(analysis_result.total) }} ₽</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <canvas id="categoryChart" width="400" height="400"></canvas>
+                    </div>
+                </div>
+                {% elif analysis_result.type == 'time' %}
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Период</th>
+                            <th class="text-end">Сумма</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for period, amount in analysis_result.data.items() %}
+                        <tr>
+                            <td>{{ period }}</td>
+                            <td class="text-end">{{ "{:,.0f}".format(amount) }} ₽</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-success">
+                            <th>Итого:</th>
+                            <th class="text-end">{{ "{:,.0f}".format(analysis_result.total) }} ₽</th>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="text-muted">Выберите тип анализа</h5>
+                <p class="text-muted">Используйте кнопки слева для анализа ваших расходов</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if analysis_result and analysis_result.type == 'category' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('categoryChart').getContext('2d');
+const data = {{ analysis_result.data | tojson | safe }};
+const labels = Object.keys(data);
+const values = Object.values(data);
+
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: labels,
+        datasets: [{
+            data: values,
+            backgroundColor: [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
