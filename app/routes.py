@@ -1,8 +1,9 @@
+import json
 import pandas as pd
 from pathlib import Path
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
 
-from .utils import ValidatorCSV, process_df
+from .utils import ValidatorCSV, PreProcessor
 
 
 main_bp = Blueprint("main", __name__)
@@ -21,7 +22,7 @@ def upload_file():
         file_path = Path(current_app.config["UPLOAD_FOLDER"], file.filename)
         file.save(Path(file_path))  # Сохранение файла в папку uploads
 
-        current_app.config["csv_file_path"] = file_path
+        session["csv_file_path"] = str(file_path)
 
         if file and ValidatorCSV.allowed_file(file.filename):
             try:
@@ -51,32 +52,51 @@ def upload_file():
 def analyze():
     """Страница анализа расходов"""
     # Проверка наличия пути к файлу в сессии
-    file_path: Path = current_app.config.get("csv_file_path")
+    file_path: Path = Path(session["csv_file_path"]) if "csv_file_path" in session else None
 
-    if not file_path or not file_path.exists():
+    if file_path is None or not file_path.exists():
         flash("Сначала необходимо загрузить CSV файл", "error")
         return redirect(url_for("main_bp.upload_file"))
 
     df = pd.read_csv(str(file_path), encoding="utf-8")
-    df = process_df(df)  # обработка и сортировка данных для анализа
+    df = PreProcessor.process_df(df)  # обработка и сортировка данных для анализа
 
-    analysis_result = analysis_type = None
+    analysis_result = analysis_type = column_name = None
+    months, years = PreProcessor.get_months_years(df)
 
     if request.method == "POST":
         action = request.form.get("action")
+        category_checked = request.form.get("analysis_type")
+        if category_checked:
+            session["category_checked"] = request.form.get("analysis_type")  # Сохранение выбранной радиокнопки
 
-        #TODO: сделать отдельные методы для каждого типа анализа
         if action == "category_analysis":
-            # Анализ по категориям
-            category_sums = df.groupby("category")["amount"].sum().sort_values(ascending=False)
-            total_amount = df["amount"].sum()
+            selected_years = request.form.getlist("selected_years")  # Получение выбранных годов
+            selected_months = request.form.getlist("selected_months")  # Получение выбранных месяцев
 
-            analysis_result = {
-                "type": "category",
-                "data": category_sums.to_dict(),
-                "total": total_amount,
-            }
-            analysis_type = "Анализ по категориям"
+            # Преобразование строки в список
+            selected_months = json.loads(selected_months[0])
+            selected_years = json.loads(selected_years[0])
+            if selected_years:
+                selected_years = list(map(int, selected_years))  # Преобразование в список чисел
+
+            current_app.logger.debug(f"selected_years={selected_years}, selected_months={selected_months}")
+
+            if session["category_checked"] == 'period':
+                if selected_years and selected_months:
+                    analysis_result, analysis_type, column_name = \
+                        PreProcessor.dates_analysis(df, "month_year", selected_years, selected_months)
+                elif selected_years:
+                    analysis_result, analysis_type, column_name = \
+                        PreProcessor.dates_analysis(df, "year", selected_years=selected_years)
+                elif selected_months:
+                    analysis_result, analysis_type, column_name = \
+                        PreProcessor.dates_analysis(df, "month", selected_months=selected_months)
+                else:
+                    flash("Не выбран период для анализа", "error")
+            else:
+                # Анализ по категориям
+                analysis_result, analysis_type, column_name = PreProcessor.category_analysis(df)
 
         elif action == "time_analysis":
             # Анализ по дням / месяцам / годам (выбор периода в форме)
@@ -104,11 +124,18 @@ def analyze():
                 "total": df["amount"].sum(),
             }
             analysis_type = period_name
+            column_name = "Период"
+
+    current_app.logger.debug(f"analysis_result={analysis_result}")
 
     return render_template(
         "analyze.html",
         analysis_result=analysis_result,
         analysis_type=analysis_type,
+        months_name=months,
+        years=years,
+        category_checked=session.get("category_checked", "category"),
+        column_name=column_name
     )
 
 

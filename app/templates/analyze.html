@@ -2,39 +2,105 @@
 
 {% block title %}Анализ расходов{% endblock %}
 
-{% block content %}
-<div class="row">
-    <div class="col-md-4">
-        <div class="card analysis-card">
-            <div class="card-header">
-                <h5 class="mb-0">📈 Виды анализа</h5>
-            </div>
-            <div class="card-body">
-                <form method="post" class="mb-3">
-                    <input type="hidden" name="action" value="category_analysis">
-                    <button type="submit" class="btn btn-outline-primary w-100">
-                        📊 Анализ по категориям
-                    </button>
-                </form>
+{% block style %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% endblock %}
 
-                <form method="post">
-                    <input type="hidden" name="action" value="time_analysis">
-                    <div class="mb-3">
-                        <label for="period" class="form-label">Период группировки:</label>
-                        <select class="form-select" name="period" id="period">
-                            <option value="day">По дням</option>
-                            <option value="month" selected>По месяцам</option>
-                            <option value="year">По годам</option>
-                        </select>
+{% block content %}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Главная</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Анализ расходов</li>
+    </ol>
+</nav>
+
+<div class="container mt-4">
+    <div class="card-header">
+                <h3 class="mb-0">📈 Виды анализа</h3>
+            </div>
+<div class="row">
+    <!-- Левый контейнер: По категориям -->
+    <div class="col-md-6">
+
+        <div class="card analysis-card">
+            
+            <div class="card-body">
+                <form id="analysis-form" method="post" class="mb-3">
+                    <div class="category-selection">
+                        <h4 class mb-0>📊 По категориям</h4>
+
+                        <!-- Выбор анализа -->
+                        <div class="analysis-type">
+                            <label>
+                                <input type="radio" name="analysis_type" id="analysis-category" value="category" {% if category_checked == 'category' %}checked{% endif %}>
+                                Разбить по категориям
+                            </label>
+                            <label>
+                                <input type="radio" name="analysis_type" id="analysis-period" value="period" {% if category_checked == 'period' %}checked{% endif %}>
+                                Разбить по периодам
+                            </label>
+
+                            <h5>Выберите периоды:</h5>
+
+                            <!-- Годы -->
+                            <div class="year-group">
+                                {% for year in years %}
+                                    <button type="button" class="btn-year" data-year="{{ year }}" onclick="toggleYear(this)" {% if category_checked == 'category' %}disabled{% endif %}>
+                                        {{ year }}
+                                    </button>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Месяцы -->
+                            <div class="month-group">
+                                {% for month_name in months_name %}
+                                    <button type="button" class="btn-month" data-month="{{ month_name }}" onclick="toggleMonth(this)" {% if category_checked == 'category' %}disabled{% endif %}>
+                                        {{ month_name }}
+                                    </button>
+                                {% endfor %}
+                            </div>
+
+                        </div>
+
+                        <!-- Кнопка анализа -->
+                        <input type="hidden" name="action" value="category_analysis">
+                        <button type="submit" class="btn-analyze">Анализировать</button>
                     </div>
-                    <button type="submit" class="btn btn-outline-success w-100">
-                        📅 Анализ по времени
-                    </button>
                 </form>
             </div>
         </div>
     </div>
 
+    <!-- Правый контейнер: За период -->
+    <div class="col-md-6">
+        <div class="card analysis-card">
+            <div class="card-body">
+                <form method="post" class="mb-3">
+                    <div class="period-selection">
+                        <h3 class="mb-0">📅 За период</h3>
+                        <input type="hidden" name="action" value="time_analysis">
+                        <div class="mb-3">
+                            <label for="period" class="form-label">Период группировки:</label>
+                            <select class="form-select" name="period" id="period">
+                                <option value="day">По дням</option>
+                                <option value="month" selected>По месяцам</option>
+                                <option value="year">По годам</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn-analyze">
+                            Анализ по времени
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Блок результатов анализа -->
+<div class="row mt-4">
     <div class="col-md-8">
         {% if analysis_result %}
         <div class="card">
@@ -42,20 +108,19 @@
                 <h5 class="mb-0">{{ analysis_type }}</h5>
             </div>
             <div class="card-body">
-                {% if analysis_result.type == 'category' %}
                 <div class="row">
                     <div class="col-md-6">
                         <table class="table table-striped">
                             <thead>
                                 <tr>
-                                    <th>Категория</th>
+                                    <th>{{ column_name }}</th>
                                     <th class="text-end">Сумма</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for category, amount in analysis_result.data.items() %}
+                                {% for item, amount in analysis_result.data.items() %}
                                 <tr>
-                                    <td>{{ category }}</td>
+                                    <td>{{ item }}</td>
                                     <td class="text-end">{{ "{:,.0f}".format(amount) }} ₽</td>
                                 </tr>
                                 {% endfor %}
@@ -67,35 +132,12 @@
                                 </tr>
                             </tfoot>
                         </table>
+
                     </div>
                     <div class="col-md-6">
                         <canvas id="categoryChart" width="400" height="400"></canvas>
                     </div>
                 </div>
-                {% elif analysis_result.type == 'time' %}
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Период</th>
-                            <th class="text-end">Сумма</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for period, amount in analysis_result.data.items() %}
-                        <tr>
-                            <td>{{ period }}</td>
-                            <td class="text-end">{{ "{:,.0f}".format(amount) }} ₽</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot>
-                        <tr class="table-success">
-                            <th>Итого:</th>
-                            <th class="text-end">{{ "{:,.0f}".format(analysis_result.total) }} ₽</th>
-                        </tr>
-                    </tfoot>
-                </table>
-                {% endif %}
             </div>
         </div>
         {% else %}
@@ -108,37 +150,43 @@
         {% endif %}
     </div>
 </div>
+</div>
 
-{% if analysis_result and analysis_result.type == 'category' %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-const ctx = document.getElementById('categoryChart').getContext('2d');
-const data = {{ analysis_result.data | tojson | safe }};
-const labels = Object.keys(data);
-const values = Object.values(data);
+{% block js %}
+    <script src="{{ url_for('static', filename='js/analyze.js') }}"></script>
+{% endblock %}
 
-new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-        labels: labels,
-        datasets: [{
-            data: values,
-            backgroundColor: [
-                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
-                '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
-            ]
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom'
+{% if analysis_result.type %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('categoryChart').getContext('2d');
+        const data = {{ analysis_result.data | tojson | safe }};
+        const labels = Object.keys(data);
+        const values = Object.values(data);
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                        '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
             }
-        }
-    }
-});
-</script>
+        });        
+    </script>
 {% endif %}
+
 {% endblock %}
