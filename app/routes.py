@@ -22,7 +22,7 @@ def upload_file():
         file_path = Path(current_app.config["UPLOAD_FOLDER"], file.filename)
         file.save(Path(file_path))  # Сохранение файла в папку uploads
 
-        session["csv_file_path"] = str(file_path)
+        session["filename"] = file.filename
 
         if file and ValidatorCSV.allowed_file(file.filename):
             try:
@@ -52,7 +52,8 @@ def upload_file():
 def analyze():
     """Страница анализа расходов"""
     # Проверка наличия пути к файлу в сессии
-    file_path: Path = Path(session["csv_file_path"]) if "csv_file_path" in session else None
+    file_path: Path = \
+        Path(current_app.config["UPLOAD_FOLDER"], session["filename"]) if "filename" in session else None
 
     if file_path is None or not file_path.exists():
         flash("Сначала необходимо загрузить CSV файл", "error")
@@ -83,6 +84,7 @@ def analyze():
             current_app.logger.debug(f"selected_years={selected_years}, selected_months={selected_months}")
 
             if session["category_checked"] == 'period':
+                # Анализ по датам для категорий
                 if selected_years and selected_months:
                     analysis_result, analysis_type, column_name = \
                         PreProcessor.dates_analysis(df, "month_year", selected_years, selected_months)
