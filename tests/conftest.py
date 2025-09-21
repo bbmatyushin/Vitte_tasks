@@ -1,9 +1,4 @@
 import os
-import sys
-
-project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_dir)
-
 import pytest
 from app import create_app
 import tempfile
@@ -18,4 +13,9 @@ def client():
 
     with app.test_client() as client:
         yield client
-        os.rmdir(app.config["UPLOAD_FOLDER"])
+
+        # Удаление файлов после завершения теста
+        for filename in os.listdir(app.config["UPLOAD_FOLDER"]):
+            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)

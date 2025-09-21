@@ -9,14 +9,19 @@ from .utils import ValidatorCSV, PreProcessor
 main_bp = Blueprint("main", __name__)
 
 
-@main_bp.route("/", methods=["GET", "POST"])
+@main_bp.route("/", methods=["GET"])
+def index():
+    return render_template("uploads.html")
+
+
+@main_bp.route("/upload", methods=["POST"])
 def upload_file():
     """Страница загрузки файла"""
     if request.method == "POST":
 
         if "file" not in request.files:  # Проверка на наличие файла
             flash("Файл не выбран", "error")
-            return redirect(request.url)
+            return redirect(url_for("main.index"))
 
         file = request.files["file"]
         file_path = Path(current_app.config["UPLOAD_FOLDER"], file.filename)
@@ -28,7 +33,7 @@ def upload_file():
             try:
                 if not file_path.exists():  # Проверка на существование файла
                     flash("Файл не был успешно загружен", "error")
-                    return redirect(request.url)
+                    return redirect(url_for("main.index"))
 
                 current_app.logger.info(f"Файл {file.filename} загружен")
 
@@ -36,16 +41,18 @@ def upload_file():
                 is_valid, message = ValidatorCSV.csv_columns_validate(df)
                 if not is_valid:
                     flash(f"Ошибка в файле: {message}", "error")
-                    return render_template("uploads.html")
+                    return redirect(url_for("main.index"))
 
                 flash("Файл успешно загружен!", "success")
                 return redirect(url_for("main.analyze"))
 
             except Exception as e:
                 current_app.logger.error(f"Ошибка обработки файла: {e}", "error")
-                return render_template("uploads.html")
+                return redirect(url_for("main.index"))
+        else:
+            flash("Неверный формат файла. Загрузите файл фомарта csv", "error")
 
-    return render_template("uploads.html")
+    return redirect(url_for("main.index"))
 
 
 @main_bp.route("/analyze", methods=["GET", "POST"])
