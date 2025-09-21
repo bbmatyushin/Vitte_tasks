@@ -1,4 +1,5 @@
 import json
+import os
 import pandas as pd
 from pathlib import Path
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
@@ -21,36 +22,32 @@ def upload_file():
 
         if "file" not in request.files:  # Проверка на наличие файла
             flash("Файл не выбран", "error")
-            return redirect(url_for("main.index"))
-
-        file = request.files["file"]
-        file_path = Path(current_app.config["UPLOAD_FOLDER"], file.filename)
-        file.save(Path(file_path))  # Сохранение файла в папку uploads
-
-        session["filename"] = file.filename
-
-        if file and ValidatorCSV.allowed_file(file.filename):
-            try:
-                if not file_path.exists():  # Проверка на существование файла
-                    flash("Файл не был успешно загружен", "error")
-                    return redirect(url_for("main.index"))
-
-                current_app.logger.info(f"Файл {file.filename} загружен")
-
-                df = pd.read_csv(file_path, encoding="utf-8")
-                is_valid, message = ValidatorCSV.csv_columns_validate(df)
-                if not is_valid:
-                    flash(f"Ошибка в файле: {message}", "error")
-                    return redirect(url_for("main.index"))
-
-                flash("Файл успешно загружен!", "success")
-                return redirect(url_for("main.analyze"))
-
-            except Exception as e:
-                current_app.logger.error(f"Ошибка обработки файла: {e}", "error")
-                return redirect(url_for("main.index"))
         else:
-            flash("Неверный формат файла. Загрузите файл фомарта csv", "error")
+            file = request.files["file"]
+            file_path = Path(current_app.config["UPLOAD_FOLDER"], file.filename)
+            file.save(Path(file_path))  # Сохранение файла в папку uploads
+            session["filename"] = file.filename
+
+            if not file_path.exists():  # Проверка на существование файла
+                flash("Файл не был успешно загружен", "error")
+            elif os.path.getsize(file_path) == 0:
+                flash("Файл пустой.", "error")
+            elif file and ValidatorCSV.allowed_file(file.filename):
+                try:
+                    current_app.logger.info(f"Файл {file.filename} загружен")
+
+                    df = pd.read_csv(file_path, encoding="utf-8")
+                    is_valid, message = ValidatorCSV.csv_columns_validate(df)
+                    if not is_valid:
+                        flash(f"Ошибка в файле: {message}", "error")
+                    else:
+                        flash("Файл успешно загружен!", "success")
+                        return redirect(url_for("main.analyze"))
+                except Exception as e:
+                    flash(f"Ошибка обработке файла: {e}", "error")
+                    current_app.logger.error(f"Ошибка обработке файла: {e}", "error")
+            else:
+                flash("Неверный формат файла. Загрузите файл фомарта csv", "error")
 
     return redirect(url_for("main.index"))
 
@@ -146,9 +143,3 @@ def analyze():
         category_checked=session.get("category_checked", "category"),
         column_name=column_name
     )
-
-
-@main_bp.errorhandler(404)
-def handle_error(error):
-    flash(f"Страница не найдена", "error")
-    return redirect(url_for("main_bp.upload_file"))

@@ -9,6 +9,7 @@ wheels/
 .env
 uploads/*.csv
 uploads/*.txt
+.coverage
 
 # Virtual environments
 .venv

@@ -31,7 +31,7 @@ class ValidatorCSV:
         try:
             df["date"] = pd.to_datetime(df["date"], errors='raise')
         except ValueError:
-            return False, "Неверный формат даты. Формат даты должен быть: YYYY-MM-DD"
+            return False, "Неверный формат даты. Формат даты должен быть: YYYY-MM-DD или DD.MM.YYYY"
 
         # Проверка формата суммы в поле amount
         try:
