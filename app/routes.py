@@ -1,10 +1,19 @@
 import json
 import os
 import pandas as pd
+import platform
+import time
+from datetime import datetime
 from pathlib import Path
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
+from flask import (
+    Blueprint, render_template,
+    request, redirect, url_for,
+    flash, current_app, session,
+    jsonify
+)
 
-from .utils import ValidatorCSV, PreProcessor
+from .utils.validator_csv import ValidatorCSV
+from .utils.pre_processor import PreProcessor, cache
 
 
 main_bp = Blueprint("main", __name__)
@@ -143,3 +152,28 @@ def analyze():
         category_checked=session.get("category_checked", "category"),
         column_name=column_name
     )
+
+
+@main_bp.route("/clear-cache", methods=["POST"])
+def clear_cache():
+    """Очищаем весь кэш"""
+    cleared = cache.clear()
+    flash(f"Кеш очищен. Удалено элементов: {cleared}", "success")
+    return redirect(request.referrer or url_for("main_bp.analyze"))
+
+
+@main_bp.route("/status", methods=["GET"])
+def status():
+    stats = cache.stats()
+    start_time = datetime.fromtimestamp(current_app.config["APP_START_TIME"]).strftime('%Y-%m-%d %H:%M:%S')
+    uptime = time.time() - current_app.config["APP_START_TIME"]
+
+    return jsonify({
+        "uptime_seconds": f"{uptime:.3f} sec.",
+        "cache_size": stats["size"],
+        "cached_keys": stats["keys"],
+        "app_start_time": start_time,
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+    })
+

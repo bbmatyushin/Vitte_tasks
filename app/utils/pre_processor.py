@@ -1,49 +1,15 @@
-from typing import Optional
 import pandas as pd
-from pandas import DataFrame
-from typing import Tuple
-from flask import request, session
+from pandas import DataFrame, Series
+from typing import Optional, Tuple, Union
+from .cache import Cache
 
 
-class ValidatorCSV:
-    ALLOWED_EXTENSIONS = ('csv',)
-    CSV_HEADERS = ("date", "category", "amount",)
-
-    @classmethod
-    def allowed_file(cls, filename: str) -> bool:
-        """Проверка на разрешенные типы файлов"""
-        result = '.' in filename and \
-                 filename.rsplit('.', 1)[1].lower() in cls.ALLOWED_EXTENSIONS
-        return result
-
-    @classmethod
-    def csv_columns_validate(cls, df: DataFrame) -> Tuple[bool, str]:
-        """Проверка корректно указанных названий столбцов в CSV файле"""
-        missing_columns = [column for column in cls.CSV_HEADERS if column not in df.columns]
-
-        if missing_columns:
-            return False, f"Отсутствуют столбцы: {', '.join(missing_columns)}"
-
-        if df.empty:
-            return False, "Файл пуст"
-
-        # Проверка формата даты в поле date
-        try:
-            df["date"] = pd.to_datetime(df["date"], errors='raise')
-        except ValueError:
-            return False, "Неверный формат даты. Формат даты должен быть: YYYY-MM-DD или DD.MM.YYYY"
-
-        # Проверка формата суммы в поле amount
-        try:
-            df["amount"] = df["amount"].astype(float)
-        except ValueError:
-            return False, "У одной из записи неверный формат суммы. Формат суммы должен быть: числом"
-
-        return True, "Ok"
+cache = Cache()
 
 
 class PreProcessor:
     @classmethod
+    @cache.cached()  # Декоратор для кеширования результатов
     def process_df(cls, df: DataFrame) -> DataFrame:
         """Обработка и отчистка данных в DataFrame. Используется после
         выполнения проверок методами csv_columns_validate и allowed_file"""
@@ -76,23 +42,6 @@ class PreProcessor:
         months = df.sort_values(["month"])["month_name"].unique()
 
         return months, years
-
-    @classmethod
-    def category_analysis(cls, df: DataFrame) -> tuple:
-        """Обработка данных по категориям"""
-        category_sums = df.groupby("category")["amount"].sum().sort_values(ascending=False)
-        total_amount = df["amount"].sum()
-
-        analysis_result = {
-            "type": "category",
-            "data": category_sums.to_dict(),
-            "total": total_amount,
-            "column_name": "Категория"
-        }
-        analysis_type = "Анализ по категориям"
-        column_name = "Категория"
-
-        return analysis_result, analysis_type, column_name
 
     @classmethod
     def dates_analysis(cls, df: DataFrame, date_type: Optional[str],
@@ -130,4 +79,19 @@ class PreProcessor:
 
         return analysis_result, analysis_type, column_name
 
+    @classmethod
+    def category_analysis(cls, df: DataFrame) -> tuple:
+        """Обработка данных по категориям"""
+        category_sums = df.groupby("category")["amount"].sum().sort_values(ascending=False)
+        total_amount = df["amount"].sum()
 
+        analysis_result = {
+            "type": "category",
+            "data": category_sums.to_dict(),
+            "total": total_amount,
+            "column_name": "Категория"
+        }
+        analysis_type = "Анализ по категориям"
+        column_name = "Категория"
+
+        return analysis_result, analysis_type, column_name

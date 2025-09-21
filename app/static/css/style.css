@@ -32,3 +32,14 @@
     border: 1px solid #ddd;
     border-radius: 8px;
 }
+
+.btn-custom-light-gray {
+            background-color: #e9ecef !important; /* Светло-серый цвет фона */
+            border-color: #ced4da !important; /* Светло-серый цвет границы */
+            color: #495057 !important; /* Цвет текста */
+}
+/* Опционально: стиль при наведении */
+.btn-custom-light-gray:hover {
+    background-color: #d1d5d8 !important;
+    border-color: #b1b5b8 !important;
+}
