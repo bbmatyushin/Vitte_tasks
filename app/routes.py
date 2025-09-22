@@ -70,7 +70,7 @@ def analyze():
 
     if file_path is None or not file_path.exists():
         flash("Сначала необходимо загрузить CSV файл", "error")
-        return redirect(url_for("main_bp.upload_file"))
+        return redirect(url_for("main.upload_file"))
 
     df = pd.read_csv(str(file_path), encoding="utf-8")
     df = PreProcessor.process_df(df)  # обработка и сортировка данных для анализа
@@ -159,7 +159,7 @@ def clear_cache():
     """Очищаем весь кэш"""
     cleared = cache.clear()
     flash(f"Кеш очищен. Удалено элементов: {cleared}", "success")
-    return redirect(request.referrer or url_for("main_bp.analyze"))
+    return redirect(request.referrer or url_for("main.analyze"))
 
 
 @main_bp.route("/status", methods=["GET"])
